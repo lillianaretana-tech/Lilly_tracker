@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LillyTech Pilot Tracker</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #607080;
+      --line: #d9e2ea;
+      --soft: #f5f7fa;
+      --panel: #ffffff;
+      --brand: #0f766e;
+      --brand-strong: #115e59;
+      --accent: #c2410c;
+      --ok: #15803d;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --shadow: 0 14px 34px rgba(16, 24, 40, .08);
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: linear-gradient(180deg, #eef4f6 0, #f7f9fb 260px, #ffffff 100%);
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    .app-shell { min-height: 100vh; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid rgba(15, 118, 110, .18);
+      background: rgba(255, 255, 255, .92);
+      backdrop-filter: blur(12px);
+    }
+
+    .topbar {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: linear-gradient(135deg, var(--brand), #1d4ed8);
+      box-shadow: 0 10px 24px rgba(15, 118, 110, .24);
+      flex: 0 0 auto;
+      font-weight: 800;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.16rem, 2vw, 1.6rem);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: .9rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--ink);
+      min-height: 38px;
+      padding: 8px 11px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 700;
+      box-shadow: 0 1px 0 rgba(16, 24, 40, .02);
+    }
+
+    .btn svg { width: 17px; height: 17px; }
+    .btn.primary { border-color: var(--brand); background: var(--brand); color: white; }
+    .btn.danger { color: var(--danger); border-color: #fecaca; }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    main {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 22px 20px 34px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .notice {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #bae6fd;
+      background: #f0f9ff;
+      color: #075985;
+      padding: 11px 13px;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .notice.show { display: flex; }
+    .notice.error { border-color: #fecaca; background: #fef2f2; color: var(--danger); }
+    .notice.success { border-color: #bbf7d0; background: #f0fdf4; color: var(--ok); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      min-height: 104px;
+      display: grid;
+      align-content: space-between;
+      gap: 10px;
+    }
+
+    .kpi span { color: var(--muted); font-size: .84rem; font-weight: 700; }
+    .kpi strong { font-size: clamp(1.55rem, 3vw, 2.25rem); line-height: 1; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 470px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .panel-body { padding: 16px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: .82rem; color: #405160; font-weight: 800; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid #cbd5df;
+      background: white;
+      color: var(--ink);
+      border-radius: 8px;
+      min-height: 40px;
+      padding: 9px 10px;
+      outline: none;
+    }
+
+    textarea { min-height: 76px; resize: vertical; }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, .13);
+    }
+
+    .section-title {
+      margin: 18px 0 10px;
+      font-size: .86rem;
+      color: var(--brand-strong);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-weight: 900;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 8px;
+    }
+
+    .check-row {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 9px;
+      align-items: start;
+      border: 1px solid #e3e9ef;
+      background: #fbfcfd;
+      padding: 9px;
+      border-radius: 8px;
+      font-size: .9rem;
+      line-height: 1.25;
+    }
+
+    .check-row input {
+      min-height: auto;
+      height: 17px;
+      margin-top: 1px;
+      accent-color: var(--brand);
+    }
+
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .workspace {
+      display: grid;
+      gap: 14px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(140px, .4fr));
+      gap: 10px;
+      align-items: end;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 520px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 880px;
+      font-size: .9rem;
+    }
+
+    th, td {
+      padding: 10px 11px;
+      text-align: left;
+      border-bottom: 1px solid #e6ecf1;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f8fafc;
+      color: #435363;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: .76rem;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .status.planificado { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .status.en-curso { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+    .status.completado { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+    .status.seguimiento { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      justify-content: center;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .detail-item {
+      border: 1px solid #e3e9ef;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fbfcfd;
+      min-height: 72px;
+    }
+
+    .detail-item span {
+      display: block;
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 5px;
+    }
+
+    .detail-item strong { font-size: .96rem; overflow-wrap: anywhere; }
+    .notes {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      color: #314252;
+    }
+
+    details.schema {
+      border-top: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    details.schema summary {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    pre {
+      margin: 0;
+      padding: 0 16px 16px;
+      overflow: auto;
+      color: #10202e;
+      font-size: .78rem;
+      line-height: 1.45;
+    }
+
+    .empty {
+      padding: 28px 14px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    @media (max-width: 1120px) {
+      .layout { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+    }
+
+    @media (max-width: 760px) {
+      .topbar { grid-template-columns: 1fr; }
+      .actions { justify-content: stretch; }
+      .actions .btn { flex: 1 1 150px; justify-content: center; }
+      main { padding: 14px 12px 24px; }
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .form-grid, .filters, .detail-grid { grid-template-columns: 1fr; }
+      .subtitle { white-space: normal; }
+      .panel-body { padding: 13px; }
+      .table-wrap { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <div class="topbar">
+        <div class="brand">
+          <div class="brand-mark">LT</div>
+          <div>
+            <h1>LillyTech Pilot Tracker</h1>
+            <div class="subtitle">Herramienta interna para pilotos de capacitación en academias LillyTech</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn" id="refreshBtn" title="Actualizar"><i data-lucide="refresh-cw"></i>Actualizar</button>
+          <button class="btn" id="excelBtn" title="Exportar Excel"><i data-lucide="file-spreadsheet"></i>Excel</button>
+          <button class="btn" id="pdfBtn" title="Exportar PDF"><i data-lucide="file-text"></i>PDF</button>
+          <button class="btn primary" id="newBtn" title="Nuevo piloto"><i data-lucide="plus"></i>Nuevo</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="notice" id="notice"><i data-lucide="info"></i><span id="noticeText"></span></div>
+
+      <section class="kpi-grid" aria-label="KPIs">
+        <div class="kpi"><span>Pilotos activos</span><strong id="kpiActive">0</strong></div>
+        <div class="kpi"><span>Completados</span><strong id="kpiCompleted">0</strong></div>
+        <div class="kpi"><span>Checklist promedio</span><strong id="kpiChecklist">0%</strong></div>
+        <div class="kpi"><span>Satisfacción promedio</span><strong id="kpiSatisfaction">0.0</strong></div>
+        <div class="kpi"><span>Seguimientos pendientes</span><strong id="kpiFollowup">0</strong></div>
+      </section>
+
+      <section class="layout">
+        <aside class="panel" id="formPanel">
+          <div class="panel-head">
+            <h2 id="formTitle">Nuevo piloto</h2>
+            <button class="btn ghost icon-btn" id="clearBtn" title="Limpiar formulario"><i data-lucide="eraser"></i></button>
+          </div>
+          <div class="panel-body">
+            <form id="pilotForm">
+              <input type="hidden" id="pilotId" />
+              <div class="form-grid">
+                <div class="field">
+                  <label for="academy">Academia</label>
+                  <input id="academy" required placeholder="LillyTech Academy" />
+                </div>
+                <div class="field">
+                  <label for="program">Programa</label>
+                  <input id="program" required placeholder="IA aplicada" />
+                </div>
+                <div class="field">
+                  <label for="pilotDate">Fecha</label>
+                  <input id="pilotDate" type="date" required />
+                </div>
+                <div class="field">
+                  <label for="status">Estado</label>
+                  <select id="status">
+                    <option>Planificado</option>
+                    <option>En curso</option>
+                    <option>Completado</option>
+                    <option>Seguimiento</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="facilitator">Facilitador</label>
+                  <input id="facilitator" placeholder="Nombre" />
+                </div>
+                <div class="field">
+                  <label for="participants">Participantes</label>
+                  <input id="participants" type="number" min="0" value="0" />
+                </div>
+                <div class="field full">
+                  <label for="objective">Objetivo del piloto</label>
+                  <textarea id="objective" placeholder="Resultado esperado, población y alcance"></textarea>
+                </div>
+              </div>
+
+              <div class="section-title">Checklist antes</div>
+              <div class="checklist" data-stage="Antes"></div>
+              <div class="section-title">Checklist durante</div>
+              <div class="checklist" data-stage="Durante"></div>
+              <div class="section-title">Checklist después</div>
+              <div class="checklist" data-stage="Después"></div>
+
+              <div class="section-title">Evaluación</div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="learningScore">Aprendizaje / 5</label>
+                  <input id="learningScore" type="number" min="0" max="5" step="0.1" />
+                </div>
+                <div class="field">
+                  <label for="satisfactionScore">Satisfacción / 5</label>
+                  <input id="satisfactionScore" type="number" min="0" max="5" step="0.1" />
+                </div>
+                <div class="field full">
+                  <label for="evaluationNotes">Notas de evaluación</label>
+                  <textarea id="evaluationNotes"></textarea>
+                </div>
+              </div>
+
+              <div class="section-title">Retroalimentación</div>
+              <div class="form-grid">
+                <div class="field full">
+                  <label for="participantFeedback">Comentarios del participante</label>
+                  <textarea id="participantFeedback"></textarea>
+                </div>
+                <div class="field">
+                  <label for="npsScore">NPS / 10</label>
+                  <input id="npsScore" type="number" min="0" max="10" />
+                </div>
+                <div class="field">
+                  <label for="recommendation">Recomendación</label>
+                  <select id="recommendation">
+                    <option value="">Sin registrar</option>
+                    <option>Sí</option>
+                    <option>No</option>
+                    <option>Con ajustes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="section-title">Seguimiento 2 a 3 semanas</div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="followupDate">Fecha de seguimiento</label>
+                  <input id="followupDate" type="date" />
+                </div>
+                <div class="field">
+                  <label for="followupStatus">Estado</label>
+                  <select id="followupStatus">
+                    <option>Pendiente</option>
+                    <option>Contactado</option>
+                    <option>Cerrado</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label for="followupNotes">Hallazgos posteriores</label>
+                  <textarea id="followupNotes"></textarea>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn" type="button" id="deleteBtn" disabled><i data-lucide="trash-2"></i>Eliminar</button>
+                <button class="btn primary" type="submit"><i data-lucide="save"></i>Guardar</button>
+              </div>
+            </form>
+          </div>
+          <details class="schema">
+            <summary>SQL de tablas Supabase</summary>
+            <pre id="schemaSql"></pre>
+          </details>
+        </aside>
+
+        <section class="workspace">
+          <div class="panel">
+            <div class="panel-head"><h2>Consulta de pilotos</h2></div>
+            <div class="panel-body">
+              <div class="filters">
+                <div class="field">
+                  <label for="search">Buscar</label>
+                  <input id="search" placeholder="Academia, programa, facilitador" />
+                </div>
+                <div class="field">
+                  <label for="statusFilter">Estado</label>
+                  <select id="statusFilter">
+                    <option value="">Todos</option>
+                    <option>Planificado</option>
+                    <option>En curso</option>
+                    <option>Completado</option>
+                    <option>Seguimiento</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="fromDate">Desde</label>
+                  <input id="fromDate" type="date" />
+                </div>
+                <div class="field">
+                  <label for="toDate">Hasta</label>
+                  <input id="toDate" type="date" />
+                </div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Academia</th>
+                    <th>Programa</th>
+                    <th>Estado</th>
+                    <th>Participantes</th>
+                    <th>Checklist</th>
+                    <th>Satisfacción</th>
+                    <th>Seguimiento</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="pilotRows"></tbody>
+              </table>
+              <div class="empty" id="emptyState">Sin registros para mostrar.</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>Vista ejecutiva</h2></div>
+            <div class="panel-body">
+              <div class="detail-grid" id="detailGrid"></div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://vgkyoyosjewdygxtnqvu.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZna3lveW9zamV3ZHlneHRucXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NTAxNDAsImV4cCI6MjA5ODIyNjE0MH0.oDxSWg61UFLqMh2MeEW6yxarZAjobhEA6TWm0KS_7CA";
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const checklistTemplate = {
+      "Antes": [
+        "Objetivo y alcance validados con coordinación LillyTech",
+        "Participantes reales confirmados",
+        "Materiales, enlaces y accesos revisados",
+        "Instrumento de evaluación preparado"
+      ],
+      "Durante": [
+        "Asistencia registrada",
+        "Actividades clave completadas",
+        "Incidencias documentadas",
+        "Evidencias de aprendizaje capturadas"
+      ],
+      "Después": [
+        "Evaluación aplicada",
+        "Retroalimentación recopilada",
+        "Ajustes del programa definidos",
+        "Seguimiento 2 a 3 semanas agendado"
+      ]
+    };
+
+    const schemaSql = `create extension if not exists pgcrypto;
+
+create table if not exists pilot_sessions (
+  id uuid primary key default gen_random_uuid(),
+  academy text not null,
+  program text not null,
+  pilot_date date not null,
+  status text not null default 'Planificado',
+  facilitator text,
+  participants integer default 0,
+  objective text,
+  learning_score numeric,
+  satisfaction_score numeric,
+  evaluation_notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists pilot_checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  pilot_session_id uuid references pilot_sessions(id) on delete cascade,
+  stage text not null,
+  item_text text not null,
+  completed boolean default false,
+  created_at timestamptz default now()
+);
+
+create table if not exists pilot_feedback (
+  id uuid primary key default gen_random_uuid(),
+  pilot_session_id uuid references pilot_sessions(id) on delete cascade,
+  participant_feedback text,
+  nps_score integer,
+  recommendation text,
+  created_at timestamptz default now()
+);
+
+create table if not exists pilot_followup (
+  id uuid primary key default gen_random_uuid(),
+  pilot_session_id uuid references pilot_sessions(id) on delete cascade,
+  followup_date date,
+  followup_status text default 'Pendiente',
+  followup_notes text,
+  created_at timestamptz default now()
+);
+
+alter table pilot_sessions enable row level security;
+alter table pilot_checklist_items enable row level security;
+alter table pilot_feedback enable row level security;
+alter table pilot_followup enable row level security;
+
+create policy "internal anon access pilot_sessions" on pilot_sessions for all using (true) with check (true);
+create policy "internal anon access pilot_checklist_items" on pilot_checklist_items for all using (true) with check (true);
+create policy "internal anon access pilot_feedback" on pilot_feedback for all using (true) with check (true);
+create policy "internal anon access pilot_followup" on pilot_followup for all using (true) with check (true);`;
+
+    const $ = (id) => document.getElementById(id);
+    const state = { sessions: [], checklists: [], feedback: [], followups: [], selectedId: null };
+
+    function today() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function normalizeStatus(status) {
+      return (status || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-");
+    }
+
+    function showNotice(message, type = "info") {
+      const notice = $("notice");
+      notice.className = `notice show ${type === "error" ? "error" : type === "success" ? "success" : ""}`;
+      $("noticeText").textContent = message;
+      setTimeout(() => notice.classList.remove("show"), type === "error" ? 7000 : 3200);
+    }
+
+    function renderChecklistInputs(values = []) {
+      document.querySelectorAll(".checklist").forEach(box => {
+        const stage = box.dataset.stage;
+        box.innerHTML = "";
+        checklistTemplate[stage].forEach(text => {
+          const existing = values.find(item => item.stage === stage && item.item_text === text);
+          const id = `check-${stage}-${text}`.replace(/[^a-z0-9]+/gi, "-");
+          const row = document.createElement("label");
+          row.className = "check-row";
+          row.innerHTML = `<input type="checkbox" id="${id}" data-stage="${stage}" data-item="${escapeHtml(text)}" ${existing?.completed ? "checked" : ""}><span>${text}</span>`;
+          box.appendChild(row);
+        });
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+    }
+
+    function formatDate(value) {
+      if (!value) return "Sin fecha";
+      const [y, m, d] = value.split("-");
+      return `${d}/${m}/${y}`;
+    }
+
+    function getRelated(id) {
+      return {
+        checklist: state.checklists.filter(item => item.pilot_session_id === id),
+        feedback: state.feedback.find(item => item.pilot_session_id === id) || {},
+        followup: state.followups.find(item => item.pilot_session_id === id) || {}
+      };
+    }
+
+    function checklistPct(items) {
+      if (!items.length) return 0;
+      return Math.round((items.filter(item => item.completed).length / items.length) * 100);
+    }
+
+    async function loadData() {
+      const [sessions, checklists, feedback, followups] = await Promise.all([
+        db.from("pilot_sessions").select("*").order("pilot_date", { ascending: false }),
+        db.from("pilot_checklist_items").select("*"),
+        db.from("pilot_feedback").select("*"),
+        db.from("pilot_followup").select("*")
+      ]);
+
+      const error = sessions.error || checklists.error || feedback.error || followups.error;
+      if (error) {
+        showNotice(`Supabase: ${error.message}. Revisa que las tablas y políticas existan.`, "error");
+        return;
+      }
+
+      state.sessions = sessions.data || [];
+      state.checklists = checklists.data || [];
+      state.feedback = feedback.data || [];
+      state.followups = followups.data || [];
+      renderAll();
+    }
+
+    function filteredSessions() {
+      const query = $("search").value.trim().toLowerCase();
+      const status = $("statusFilter").value;
+      const from = $("fromDate").value;
+      const to = $("toDate").value;
+
+      return state.sessions.filter(row => {
+        const haystack = `${row.academy} ${row.program} ${row.facilitator}`.toLowerCase();
+        return (!query || haystack.includes(query))
+          && (!status || row.status === status)
+          && (!from || row.pilot_date >= from)
+          && (!to || row.pilot_date <= to);
+      });
+    }
+
+    function renderRows() {
+      const rows = filteredSessions();
+      const tbody = $("pilotRows");
+      tbody.innerHTML = "";
+      $("emptyState").style.display = rows.length ? "none" : "block";
+
+      rows.forEach(row => {
+        const related = getRelated(row.id);
+        const pct = checklistPct(related.checklist);
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${formatDate(row.pilot_date)}</td>
+          <td><strong>${escapeHtml(row.academy)}</strong></td>
+          <td>${escapeHtml(row.program)}</td>
+          <td><span class="status ${normalizeStatus(row.status)}">${escapeHtml(row.status)}</span></td>
+          <td>${Number(row.participants || 0)}</td>
+          <td>${pct}%</td>
+          <td>${row.satisfaction_score ?? "-"}</td>
+          <td>${escapeHtml(related.followup.followup_status || "Pendiente")}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn icon-btn" title="Ver" data-action="view" data-id="${row.id}"><i data-lucide="eye"></i></button>
+              <button class="btn icon-btn" title="Editar" data-action="edit" data-id="${row.id}"><i data-lucide="pencil"></i></button>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    function renderKpis() {
+      const totalActive = state.sessions.filter(row => row.status !== "Completado").length;
+      const completed = state.sessions.filter(row => row.status === "Completado").length;
+      const pctValues = state.sessions.map(row => checklistPct(getRelated(row.id).checklist));
+      const avgChecklist = pctValues.length ? Math.round(pctValues.reduce((a, b) => a + b, 0) / pctValues.length) : 0;
+      const scores = state.sessions.map(row => Number(row.satisfaction_score)).filter(Number.isFinite);
+      const avgScore = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : "0.0";
+      const pending = state.followups.filter(row => row.followup_status !== "Cerrado").length;
+      $("kpiActive").textContent = totalActive;
+      $("kpiCompleted").textContent = completed;
+      $("kpiChecklist").textContent = `${avgChecklist}%`;
+      $("kpiSatisfaction").textContent = avgScore;
+      $("kpiFollowup").textContent = pending;
+    }
+
+    function renderDetails(id = state.selectedId || state.sessions[0]?.id) {
+      const row = state.sessions.find(item => item.id === id);
+      const grid = $("detailGrid");
+      if (!row) {
+        grid.innerHTML = `<div class="empty">Selecciona un piloto para ver el resumen.</div>`;
+        return;
+      }
+      const related = getRelated(row.id);
+      state.selectedId = row.id;
+      grid.innerHTML = `
+        <div class="detail-item"><span>Academia</span><strong>${escapeHtml(row.academy)}</strong></div>
+        <div class="detail-item"><span>Programa</span><strong>${escapeHtml(row.program)}</strong></div>
+        <div class="detail-item"><span>Fecha</span><strong>${formatDate(row.pilot_date)}</strong></div>
+        <div class="detail-item"><span>Estado</span><strong>${escapeHtml(row.status)}</strong></div>
+        <div class="detail-item"><span>Participantes</span><strong>${Number(row.participants || 0)}</strong></div>
+        <div class="detail-item"><span>Checklist</span><strong>${checklistPct(related.checklist)}%</strong></div>
+        <div class="detail-item"><span>Aprendizaje</span><strong>${row.learning_score ?? "-"}/5</strong></div>
+        <div class="detail-item"><span>Satisfacción</span><strong>${row.satisfaction_score ?? "-"}/5</strong></div>
+        <div class="detail-item"><span>NPS</span><strong>${related.feedback.nps_score ?? "-"}/10</strong></div>
+        <div class="detail-item"><span>Recomendación</span><strong>${escapeHtml(related.feedback.recommendation || "-")}</strong></div>
+        <div class="detail-item"><span>Seguimiento</span><strong>${escapeHtml(related.followup.followup_status || "Pendiente")}</strong></div>
+        <div class="detail-item"><span>Fecha seguimiento</span><strong>${formatDate(related.followup.followup_date)}</strong></div>
+        <div class="detail-item" style="grid-column:1/-1"><span>Objetivo</span><div class="notes">${escapeHtml(row.objective || "-")}</div></div>
+        <div class="detail-item" style="grid-column:1/-1"><span>Evaluación</span><div class="notes">${escapeHtml(row.evaluation_notes || "-")}</div></div>
+        <div class="detail-item" style="grid-column:1/-1"><span>Retroalimentación</span><div class="notes">${escapeHtml(related.feedback.participant_feedback || "-")}</div></div>
+        <div class="detail-item" style="grid-column:1/-1"><span>Hallazgos posteriores</span><div class="notes">${escapeHtml(related.followup.followup_notes || "-")}</div></div>`;
+    }
+
+    function renderAll() {
+      renderRows();
+      renderKpis();
+      renderDetails();
+    }
+
+    function clearForm() {
+      $("pilotForm").reset();
+      $("pilotId").value = "";
+      $("pilotDate").value = today();
+      $("participants").value = 0;
+      $("status").value = "Planificado";
+      $("followupStatus").value = "Pendiente";
+      $("formTitle").textContent = "Nuevo piloto";
+      $("deleteBtn").disabled = true;
+      renderChecklistInputs();
+    }
+
+    function fillForm(id) {
+      const row = state.sessions.find(item => item.id === id);
+      if (!row) return;
+      const related = getRelated(id);
+      $("pilotId").value = row.id;
+      $("academy").value = row.academy || "";
+      $("program").value = row.program || "";
+      $("pilotDate").value = row.pilot_date || today();
+      $("status").value = row.status || "Planificado";
+      $("facilitator").value = row.facilitator || "";
+      $("participants").value = row.participants || 0;
+      $("objective").value = row.objective || "";
+      $("learningScore").value = row.learning_score ?? "";
+      $("satisfactionScore").value = row.satisfaction_score ?? "";
+      $("evaluationNotes").value = row.evaluation_notes || "";
+      $("participantFeedback").value = related.feedback.participant_feedback || "";
+      $("npsScore").value = related.feedback.nps_score ?? "";
+      $("recommendation").value = related.feedback.recommendation || "";
+      $("followupDate").value = related.followup.followup_date || "";
+      $("followupStatus").value = related.followup.followup_status || "Pendiente";
+      $("followupNotes").value = related.followup.followup_notes || "";
+      $("formTitle").textContent = "Editar piloto";
+      $("deleteBtn").disabled = false;
+      renderChecklistInputs(related.checklist);
+      state.selectedId = id;
+      renderDetails(id);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function getFormPayload() {
+      return {
+        session: {
+          academy: $("academy").value.trim(),
+          program: $("program").value.trim(),
+          pilot_date: $("pilotDate").value,
+          status: $("status").value,
+          facilitator: $("facilitator").value.trim(),
+          participants: Number($("participants").value || 0),
+          objective: $("objective").value.trim(),
+          learning_score: $("learningScore").value === "" ? null : Number($("learningScore").value),
+          satisfaction_score: $("satisfactionScore").value === "" ? null : Number($("satisfactionScore").value),
+          evaluation_notes: $("evaluationNotes").value.trim(),
+          updated_at: new Date().toISOString()
+        },
+        checklist: Array.from(document.querySelectorAll(".checklist input")).map(input => ({
+          stage: input.dataset.stage,
+          item_text: input.dataset.item,
+          completed: input.checked
+        })),
+        feedback: {
+          participant_feedback: $("participantFeedback").value.trim(),
+          nps_score: $("npsScore").value === "" ? null : Number($("npsScore").value),
+          recommendation: $("recommendation").value || null
+        },
+        followup: {
+          followup_date: $("followupDate").value || null,
+          followup_status: $("followupStatus").value,
+          followup_notes: $("followupNotes").value.trim()
+        }
+      };
+    }
+
+    async function savePilot(event) {
+      event.preventDefault();
+      const id = $("pilotId").value;
+      const payload = getFormPayload();
+      let sessionId = id;
+
+      const sessionResult = id
+        ? await db.from("pilot_sessions").update(payload.session).eq("id", id).select("id").single()
+        : await db.from("pilot_sessions").insert(payload.session).select("id").single();
+
+      if (sessionResult.error) {
+        showNotice(`No se pudo guardar el piloto: ${sessionResult.error.message}`, "error");
+        return;
+      }
+
+      sessionId = sessionResult.data.id;
+      await db.from("pilot_checklist_items").delete().eq("pilot_session_id", sessionId);
+      await db.from("pilot_feedback").delete().eq("pilot_session_id", sessionId);
+      await db.from("pilot_followup").delete().eq("pilot_session_id", sessionId);
+
+      const checklistRows = payload.checklist.map(item => ({ ...item, pilot_session_id: sessionId }));
+      const writeOps = [
+        db.from("pilot_checklist_items").insert(checklistRows),
+        db.from("pilot_feedback").insert({ ...payload.feedback, pilot_session_id: sessionId }),
+        db.from("pilot_followup").insert({ ...payload.followup, pilot_session_id: sessionId })
+      ];
+      const results = await Promise.all(writeOps);
+      const error = results.find(result => result.error)?.error;
+      if (error) {
+        showNotice(`El piloto se guardó parcialmente: ${error.message}`, "error");
+        return;
+      }
+      showNotice("Piloto guardado correctamente.", "success");
+      await loadData();
+      fillForm(sessionId);
+    }
+
+    async function deletePilot() {
+      const id = $("pilotId").value;
+      if (!id || !confirm("¿Eliminar este piloto y sus registros relacionados?")) return;
+      const result = await db.from("pilot_sessions").delete().eq("id", id);
+      if (result.error) {
+        showNotice(`No se pudo eliminar: ${result.error.message}`, "error");
+        return;
+      }
+      showNotice("Piloto eliminado.", "success");
+      clearForm();
+      await loadData();
+    }
+
+    function flatRows() {
+      return filteredSessions().map(row => {
+        const related = getRelated(row.id);
+        return {
+          Fecha: row.pilot_date,
+          Academia: row.academy,
+          Programa: row.program,
+          Estado: row.status,
+          Facilitador: row.facilitator,
+          Participantes: row.participants,
+          Objetivo: row.objective,
+          "Checklist %": checklistPct(related.checklist),
+          "Aprendizaje / 5": row.learning_score,
+          "Satisfacción / 5": row.satisfaction_score,
+          "Notas evaluación": row.evaluation_notes,
+          "Feedback participante": related.feedback.participant_feedback,
+          "NPS / 10": related.feedback.nps_score,
+          Recomendación: related.feedback.recommendation,
+          "Fecha seguimiento": related.followup.followup_date,
+          "Estado seguimiento": related.followup.followup_status,
+          "Hallazgos posteriores": related.followup.followup_notes
+        };
+      });
+    }
+
+    function exportExcel() {
+      const rows = flatRows();
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Pilotos");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.checklists), "Checklist");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.feedback), "Feedback");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.followups), "Seguimiento");
+      XLSX.writeFile(wb, `LillyTech-Pilot-Tracker-${today()}.xlsx`);
+    }
+
+    function exportPdf() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+      const rows = flatRows();
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, doc.internal.pageSize.width, 66, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.text("LillyTech Pilot Tracker", 36, 39);
+      doc.setFontSize(9);
+      doc.text(`Reporte interno generado el ${formatDate(today())}`, 36, 55);
+      doc.setTextColor(23, 33, 43);
+      doc.setFontSize(11);
+      doc.text(`Pilotos: ${rows.length}   Activos: ${$("kpiActive").textContent}   Completados: ${$("kpiCompleted").textContent}   Satisfacción promedio: ${$("kpiSatisfaction").textContent}`, 36, 92);
+      doc.autoTable({
+        startY: 110,
+        head: [["Fecha", "Academia", "Programa", "Estado", "Participantes", "Checklist", "Satisfacción", "Seguimiento"]],
+        body: rows.map(row => [row.Fecha, row.Academia, row.Programa, row.Estado, row.Participantes, `${row["Checklist %"]}%`, row["Satisfacción / 5"] ?? "-", row["Estado seguimiento"] || "-"]),
+        styles: { fontSize: 8, cellPadding: 5 },
+        headStyles: { fillColor: [15, 118, 110] },
+        alternateRowStyles: { fillColor: [245, 247, 250] }
+      });
+      doc.save(`LillyTech-Pilot-Tracker-${today()}.pdf`);
+    }
+
+    function bindEvents() {
+      $("pilotForm").addEventListener("submit", savePilot);
+      $("deleteBtn").addEventListener("click", deletePilot);
+      $("clearBtn").addEventListener("click", clearForm);
+      $("newBtn").addEventListener("click", clearForm);
+      $("refreshBtn").addEventListener("click", loadData);
+      $("excelBtn").addEventListener("click", exportExcel);
+      $("pdfBtn").addEventListener("click", exportPdf);
+      ["search", "statusFilter", "fromDate", "toDate"].forEach(id => $(id).addEventListener("input", renderAll));
+      $("pilotRows").addEventListener("click", event => {
+        const button = event.target.closest("button[data-id]");
+        if (!button) return;
+        const id = button.dataset.id;
+        if (button.dataset.action === "edit") fillForm(id);
+        if (button.dataset.action === "view") renderDetails(id);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      $("schemaSql").textContent = schemaSql;
+      lucide.createIcons();
+      bindEvents();
+      clearForm();
+      await loadData();
+    });
+  </script>
+</body>
+</html>
